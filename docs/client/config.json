@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "IBC-GO - gRPC Gateway docs",
-    "description": "A REST interface for state queries",
+    "title": "IBC-GO API Documentation",
+    "description": "REST interface for IBC state queries and operations",
     "version": "1.0.0"
   },
   "apis": [
@@ -61,6 +61,6 @@
           "Params": "ChannelParams"
         }
       }
-    },
+    }
   ]
 }
