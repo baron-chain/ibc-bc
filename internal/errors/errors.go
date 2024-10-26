@@ -2,62 +2,118 @@ package errors
 
 import (
 	errorsmod "cosmossdk.io/errors"
-
 	"github.com/cosmos/ibc-go/v7/modules/core/exported"
 )
 
-const codespace = exported.ModuleName
-
-var (
-	// ErrInvalidSequence is used the sequence number (nonce) is incorrect
-	// for the signature.
-	ErrInvalidSequence = errorsmod.Register(codespace, 1, "invalid sequence")
-
-	// ErrUnauthorized is used whenever a request without sufficient
-	// authorization is handled.
-	ErrUnauthorized = errorsmod.Register(codespace, 2, "unauthorized")
-
-	// ErrInsufficientFunds is used when the account cannot pay requested amount.
-	ErrInsufficientFunds = errorsmod.Register(codespace, 3, "insufficient funds")
-
-	// ErrUnknownRequest is used when the request body.
-	ErrUnknownRequest = errorsmod.Register(codespace, 4, "unknown request")
-
-	// ErrInvalidAddress is used when an address is found to be invalid.
-	ErrInvalidAddress = errorsmod.Register(codespace, 5, "invalid address")
-
-	// ErrInvalidCoins is used when sdk.Coins are invalid.
-	ErrInvalidCoins = errorsmod.Register(codespace, 6, "invalid coins")
-
-	// ErrOutOfGas is used when there is not enough gas.
-	ErrOutOfGas = errorsmod.Register(codespace, 7, "out of gas")
-
-	// ErrInvalidRequest defines an ABCI typed error where the request contains
-	// invalid data.
-	ErrInvalidRequest = errorsmod.Register(codespace, 8, "invalid request")
-
-	// ErrInvalidHeight defines an error for an invalid height
-	ErrInvalidHeight = errorsmod.Register(codespace, 9, "invalid height")
-
-	// ErrInvalidVersion defines a general error for an invalid version
-	ErrInvalidVersion = errorsmod.Register(codespace, 10, "invalid version")
-
-	// ErrInvalidChainID defines an error when the chain-id is invalid.
-	ErrInvalidChainID = errorsmod.Register(codespace, 11, "invalid chain-id")
-
-	// ErrInvalidType defines an error an invalid type.
-	ErrInvalidType = errorsmod.Register(codespace, 12, "invalid type")
-
-	// ErrPackAny defines an error when packing a protobuf message to Any fails.
-	ErrPackAny = errorsmod.Register(codespace, 13, "failed packing protobuf message to Any")
-
-	// ErrUnpackAny defines an error when unpacking a protobuf message from Any fails.
-	ErrUnpackAny = errorsmod.Register(codespace, 14, "failed unpacking protobuf message from Any")
-
-	// ErrLogic defines an internal logic error, e.g. an invariant or assertion
-	// that is violated. It is a programmer error, not a user-facing error.
-	ErrLogic = errorsmod.Register(codespace, 15, "internal logic error")
-
-	// ErrNotFound defines an error when requested entity doesn't exist in the state.
-	ErrNotFound = errorsmod.Register(codespace, 16, "not found")
+// Error codes
+const (
+	CodeInvalidSequence = iota + 1
+	CodeUnauthorized
+	CodeInsufficientFunds
+	CodeUnknownRequest
+	CodeInvalidAddress
+	CodeInvalidCoins
+	CodeOutOfGas
+	CodeInvalidRequest
+	CodeInvalidHeight
+	CodeInvalidVersion
+	CodeInvalidChainID
+	CodeInvalidType
+	CodePackAny
+	CodeUnpackAny
+	CodeLogic
+	CodeNotFound
 )
+
+// Error categories for grouping related errors
+const (
+	CategoryValidation = "validation"
+	CategoryState     = "state"
+	CategoryProtobuf  = "protobuf"
+	CategorySecurity  = "security"
+	CategoryInternal  = "internal"
+)
+
+// Register all errors with their respective codes and messages
+var (
+	// Authentication and Authorization
+	ErrUnauthorized = errorsmod.Register(exported.ModuleName, CodeUnauthorized,
+		"unauthorized access attempt")
+	
+	// Validation Errors
+	ErrInvalidSequence = errorsmod.Register(exported.ModuleName, CodeInvalidSequence,
+		"invalid sequence number for signature")
+	ErrInvalidAddress = errorsmod.Register(exported.ModuleName, CodeInvalidAddress,
+		"invalid address format or checksum")
+	ErrInvalidCoins = errorsmod.Register(exported.ModuleName, CodeInvalidCoins,
+		"invalid coin denomination or amount")
+	ErrInvalidHeight = errorsmod.Register(exported.ModuleName, CodeInvalidHeight,
+		"invalid block height specified")
+	ErrInvalidVersion = errorsmod.Register(exported.ModuleName, CodeInvalidVersion,
+		"invalid protocol version")
+	ErrInvalidChainID = errorsmod.Register(exported.ModuleName, CodeInvalidChainID,
+		"invalid chain identifier")
+	ErrInvalidType = errorsmod.Register(exported.ModuleName, CodeInvalidType,
+		"invalid type or format")
+	ErrInvalidRequest = errorsmod.Register(exported.ModuleName, CodeInvalidRequest,
+		"request contains invalid or malformed data")
+	
+	// State Errors
+	ErrInsufficientFunds = errorsmod.Register(exported.ModuleName, CodeInsufficientFunds,
+		"insufficient account balance for transaction")
+	ErrOutOfGas = errorsmod.Register(exported.ModuleName, CodeOutOfGas,
+		"operation exceeded gas limit")
+	ErrNotFound = errorsmod.Register(exported.ModuleName, CodeNotFound,
+		"requested entity not found in state")
+	
+	// Protocol Errors
+	ErrUnknownRequest = errorsmod.Register(exported.ModuleName, CodeUnknownRequest,
+		"unknown or unsupported request type")
+	ErrPackAny = errorsmod.Register(exported.ModuleName, CodePackAny,
+		"failed to pack protobuf message to Any type")
+	ErrUnpackAny = errorsmod.Register(exported.ModuleName, CodeUnpackAny,
+		"failed to unpack protobuf message from Any type")
+	
+	// Internal Errors
+	ErrLogic = errorsmod.Register(exported.ModuleName, CodeLogic,
+		"internal logic error - possible invariant violation")
+)
+
+// IsValidationError checks if the error is related to validation
+func IsValidationError(err error) bool {
+	code := errorsmod.ABCICode(err)
+	return code == CodeInvalidSequence ||
+		code == CodeInvalidAddress ||
+		code == CodeInvalidCoins ||
+		code == CodeInvalidHeight ||
+		code == CodeInvalidVersion ||
+		code == CodeInvalidChainID ||
+		code == CodeInvalidType ||
+		code == CodeInvalidRequest
+}
+
+// IsStateError checks if the error is related to state operations
+func IsStateError(err error) bool {
+	code := errorsmod.ABCICode(err)
+	return code == CodeInsufficientFunds ||
+		code == CodeOutOfGas ||
+		code == CodeNotFound
+}
+
+// IsProtobufError checks if the error is related to protobuf operations
+func IsProtobufError(err error) bool {
+	code := errorsmod.ABCICode(err)
+	return code == CodePackAny ||
+		code == CodeUnpackAny
+}
+
+// IsSecurityError checks if the error is related to security
+func IsSecurityError(err error) bool {
+	code := errorsmod.ABCICode(err)
+	return code == CodeUnauthorized
+}
+
+// WrapError wraps an existing error with additional context
+func WrapError(err error, msg string) error {
+	return errorsmod.Wrap(err, msg)
+}

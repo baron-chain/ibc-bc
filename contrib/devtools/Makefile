@@ -1,76 +1,91 @@
-###
-# Find OS and Go environment
-# GO contains the Go binary
-# FS contains the OS file separator
-###
+SHELL := /bin/bash
+
+# Environment detection
+GO        := $(shell which go 2>/dev/null)
+UNAME_S   := $(shell uname -s 2>/dev/null)
+UNAME_M   := $(shell uname -m 2>/dev/null)
+GOPATH    := $(shell go env GOPATH)
+
+# OS-specific settings
 ifeq ($(OS),Windows_NT)
-  GO := $(shell where go.exe 2> NUL)
-  FS := "\\"
+    FS      := \\
+    GO      := $(shell where go.exe 2>NUL)
+    NULL    := NUL
+    MKDIR   := mkdir
+    RMDIR   := rmdir /s /q
 else
-  GO := $(shell command -v go 2> /dev/null)
-  FS := "/"
+    FS      := /
+    NULL    := /dev/null
+    MKDIR   := mkdir -p
+    RMDIR   := rm -rf
 endif
 
+# Directories and paths
+PREFIX       ?= /usr/local
+BIN          ?= $(PREFIX)/bin
+TOOLS_DIR    := $(GOPATH)/bin
+GITHUB_DIR   := $(GOPATH)$(FS)src$(FS)github.com
+MKFILE_PATH  := $(abspath $(lastword $(MAKEFILE_LIST)))
+MKFILE_DIR   := $(dir $(MKFILE_PATH))
+
+# Tool versions and paths
+BUF_VERSION  ?= 0.11.0
+STATIK       := $(TOOLS_DIR)/statik
+RUNSIM       := $(TOOLS_DIR)/runsim
+
+# Validate Go installation
 ifeq ($(GO),)
-  $(error could not find go. Is it in PATH? $(GO))
+    $(error Go not found. Please install Go and ensure it's in PATH)
 endif
 
-###############################################################################
-###                                Functions                                ###
-###############################################################################
+# Function to safely create GitHub directory and clone/update repository
+define fetch_repo
+	@echo "Fetching $(1)/$(2)@$(3)..."
+	@$(MKDIR) "$(GITHUB_DIR)$(FS)$(1)" 2>$(NULL) || true
+	@if [ ! -d "$(GITHUB_DIR)$(FS)$(1)$(FS)$(2)" ]; then \
+		cd "$(GITHUB_DIR)$(FS)$(1)" && git clone https://github.com/$(1)/$(2); \
+	fi
+	@cd "$(GITHUB_DIR)$(FS)$(1)$(FS)$(2)" && git fetch origin && git checkout -q $(3)
+endef
 
-go_get = $(if $(findstring Windows_NT,$(OS)),\
-IF NOT EXIST $(GITHUBDIR)$(FS)$(1)$(FS) ( mkdir $(GITHUBDIR)$(FS)$(1) ) else (cd .) &\
-IF NOT EXIST $(GITHUBDIR)$(FS)$(1)$(FS)$(2)$(FS) ( cd $(GITHUBDIR)$(FS)$(1) && git clone https://github.com/$(1)/$(2) ) else (cd .) &\
-,\
-mkdir -p $(GITHUBDIR)$(FS)$(1) &&\
-(test ! -d $(GITHUBDIR)$(FS)$(1)$(FS)$(2) && cd $(GITHUBDIR)$(FS)$(1) && git clone https://github.com/$(1)/$(2)) || true &&\
-)\
-cd $(GITHUBDIR)$(FS)$(1)$(FS)$(2) && git fetch origin && git checkout -q $(3)
+.PHONY: all tools clean statik runsim
 
-mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-mkfile_dir := $(shell cd $(shell dirname $(mkfile_path)); pwd)
+all: tools
 
-
-###############################################################################
-###                                 Tools                                   ###
-###############################################################################
-
-PREFIX ?= /usr/local
-BIN ?= $(PREFIX)/bin
-UNAME_S ?= $(shell uname -s)
-UNAME_M ?= $(shell uname -m)
-
-GOPATH ?= $(shell $(GO) env GOPATH)
-GITHUBDIR := $(GOPATH)$(FS)src$(FS)github.com
-
-BUF_VERSION ?= 0.11.0
-
-TOOLS_DESTDIR  ?= $(GOPATH)/bin
-STATIK         = $(TOOLS_DESTDIR)/statik
-RUNSIM         = $(TOOLS_DESTDIR)/runsim
-
+# Tools installation
 tools: tools-stamp
-tools-stamp: statik runsim
-	# Create dummy file to satisfy dependency and avoid
-	# rebuilding when this Makefile target is hit twice
-	# in a row.
-	touch $@
 
-# Install the runsim binary
+tools-stamp: statik runsim
+	@touch $@
+
 statik: $(STATIK)
 $(STATIK):
 	@echo "Installing statik..."
 	@go install github.com/rakyll/statik@v0.1.6
+	@which statik > /dev/null || { echo "statik installation failed"; exit 1; }
 
-# Install the runsim binary
 runsim: $(RUNSIM)
 $(RUNSIM):
 	@echo "Installing runsim..."
 	@go install github.com/cosmos/tools/cmd/runsim@v1.0.0
+	@which runsim > /dev/null || { echo "runsim installation failed"; exit 1; }
+
+# Cleaning targets
+clean: tools-clean
 
 tools-clean:
-	rm -f $(STATIK) $(GOLANGCI_LINT) $(RUNSIM)
-	rm -f tools-stamp
+	@echo "Cleaning tools..."
+	@rm -f $(STATIK) $(RUNSIM)
+	@rm -f tools-stamp
 
-.PHONY: tools-clean statik runsim
+# Help target
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all          - Install all tools"
+	@echo "  tools        - Install development tools"
+	@echo "  statik       - Install statik tool"
+	@echo "  runsim       - Install runsim tool"
+	@echo "  clean        - Clean all generated files"
+	@echo "  tools-clean  - Clean installed tools"
+	@echo "  help         - Show this help message"
