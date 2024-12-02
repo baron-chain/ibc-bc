@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>ibc-go</h1>
+  <h1>BC's ibc-go</h1>
 </div>
 
 ![banner](docs/ibc-go-image.png)
