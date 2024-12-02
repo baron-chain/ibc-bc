@@ -1,35 +1,54 @@
-FROM golang:1.19 as builder
+FROM golang:1.21-alpine AS builder
 
-ARG IBC_GO_VERSION
-
+ARG BARON_CHAIN_VERSION
 ENV GOPATH=""
 ENV GOMODULE="on"
+ENV CGO_ENABLED=0
 
-# ensure the ibc go version is being specified for this image.
-RUN test -n "${IBC_GO_VERSION}"
+# Ensure Baron Chain version is specified
+RUN test -n "${BARON_CHAIN_VERSION}"
 
-COPY go.mod .
-COPY go.sum .
+# Install build dependencies
+RUN apk add --no-cache make git
 
-RUN go mod download
+# Set working directory
+WORKDIR /baron-chain
 
-ADD internal internal
-ADD testing testing
-ADD modules modules
-ADD LICENSE LICENSE
+# Download dependencies first (better layer caching)
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-COPY contrib/devtools/Makefile contrib/devtools/Makefile
+# Copy source code
+COPY internal/ internal/
+COPY testing/ testing/
+COPY modules/ modules/
+COPY LICENSE .
+COPY contrib/devtools/Makefile contrib/devtools/
 COPY Makefile .
 
+# Build Baron Chain daemon
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    make build
 
-RUN make build
+# Production image
+FROM alpine:3.19
 
-FROM ubuntu:22.04
+ARG BARON_CHAIN_VERSION
+LABEL "org.baron-chain.version" "${BARON_CHAIN_VERSION}"
 
-ARG IBC_GO_VERSION
+# Add runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
-LABEL "org.cosmos.ibc-go" "${IBC_GO_VERSION}"
+# Copy binary
+COPY --from=builder /baron-chain/build/barond /usr/local/bin/
 
-COPY --from=builder /go/build/simd /bin/simd
+# Create non-root user
+RUN addgroup -g 1000 baron && \
+    adduser -D -u 1000 -G baron baron
 
-ENTRYPOINT ["simd"]
+# Switch to non-root user
+USER baron
+
+# Set entrypoint
+ENTRYPOINT ["barond"]
